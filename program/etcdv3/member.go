@@ -20,7 +20,7 @@ func (c *Etcd3Client) Members() ([]*Member, error) {
 		if len(member.ClientURLs) > 0 {
 			mm := member
 			func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 				defer cancel()
 				m := &Member{
 					Member: mm,
@@ -37,7 +37,6 @@ func (c *Etcd3Client) Members() ([]*Member, error) {
 					}
 				}
 				members = append(members, m)
-
 			}()
 
 		}

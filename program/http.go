@@ -10,6 +10,7 @@ import (
 	"github.com/qiuhoude/etcd-manage/program/v1"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -18,7 +19,7 @@ import (
 func (p *Program) startAPI() {
 	router := gin.Default()
 	//设置跨域中间件
-	router.Use(p.middleware())
+	router.Use(p.middlewareCors())
 
 	// 设置静态文件目录
 	router.GET("/ui/*w", p.handlerStatic)
@@ -28,7 +29,7 @@ func (p *Program) startAPI() {
 	})
 
 	// 读取认证列表,添加到gin.Accounts中
-	accounts := make(gin.Accounts, 0)
+	accounts := gin.Accounts{}
 	if p.cfg.Users != nil {
 		for _, u := range p.cfg.Users {
 			accounts[u.Username] = u.Password
@@ -71,15 +72,28 @@ func (p *Program) startAPI() {
 
 // --------------------------- 中间件 -------------------------
 // 跨域中间件
-func (p *Program) middleware() gin.HandlerFunc {
+func (p *Program) middlewareCors() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// gin设置响应头，设置跨域
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Access-Control-Allow-Origin")
-		c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
+		method := c.Request.Method
+		origin := c.Request.Header.Get("Origin")
+		var filterHost = [...]string{"http://localhost.*", "http://.*"}
+		// filterHost 做过滤器，防止不合法的域名访问
+		var isAccess = false
+		for _, v := range filterHost {
+			match, _ := regexp.MatchString(v, origin)
+			if match {
+				isAccess = true
+			}
+		}
+		if isAccess {
+			// gin设置响应头，设置跨域
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Access-Control-Allow-Origin")
+			c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
+		}
 		//放行所有OPTIONS方法
-		if c.Request.Method == "OPTIONS" {
+		if method == "OPTIONS" {
 			c.Status(http.StatusOK)
 		}
 	}
@@ -110,7 +124,7 @@ func (p *Program) middlewareEtcd() gin.HandlerFunc {
 
 		// 绑定etcd 连接
 		etcdServerName := c.GetHeader("EtcdServerName")
-		fmt.Println("etcdServerName ->", etcdServerName)
+		//fmt.Println("etcdServerName ->", etcdServerName)
 		if strings.EqualFold("", etcdServerName) || strings.EqualFold("null", etcdServerName) {
 			etcdServerName = "default"
 		}

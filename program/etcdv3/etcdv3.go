@@ -5,6 +5,8 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/qiuhoude/etcd-manage/program/config"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -82,4 +84,57 @@ func GetEtcdCli(etcdCfg *config.EtcdServer) (*Etcd3Client, error) {
 		return nil, errors.New("Getting etcd client error")
 	}
 	return &Etcd3Client{val.(*clientv3.Client)}, nil
+}
+
+// node 列表格式化成json
+func NodeJsonFormat(prefix string, list []*Node) (interface{}, error) {
+	ret := make(map[string]interface{}, 0)
+	if len(list) == 0 {
+		return ret, nil
+	}
+	for _, n := range list {
+		key := strings.TrimPrefix(n.FullDir, prefix)
+		key = strings.TrimRight(key, "/")
+		strs := strings.Split(key, "/")
+		recursiveJsonMap(strs, n, ret)
+	}
+	return ret, nil
+}
+
+//递归的将一个值赋值到map中
+func recursiveJsonMap(strs []string, node *Node, parent map[string]interface{}) {
+	if len(strs) == 0 || strs[0] == "" || node == nil || parent == nil { // 递归结束条件
+		return
+	}
+	if _, ok := parent[strs[0]]; !ok { // 不存在创建目录
+		if node.Value == DEFAULT_DIR_VALUE {
+			parent[strs[0]] = make(map[string]interface{}, 0)
+		} else {
+			parent[strs[0]] = formatValue(node.Value)
+		}
+	}
+
+	if val, ok := parent[strs[0]].(map[string]interface{}); ok {
+		recursiveJsonMap(strs[1:], node, val)
+	}
+}
+
+// Format 时获取值，转为指定类型
+func formatValue(v string) interface{} {
+	if strings.EqualFold(v, "true") {
+		return true
+	} else if strings.EqualFold(v, "false") {
+		return false
+	}
+	// 尝试转浮点数
+	vf, err := strconv.ParseFloat(v, 64)
+	if err == nil {
+		return vf
+	}
+	// 尝试转整数
+	vi, err := strconv.ParseInt(v, 10, 64)
+	if err == nil {
+		return vi
+	}
+	return v
 }

@@ -49,7 +49,7 @@ key_file = "key_file"
 [[server]]
 title = "default"
 name = "default"
-address = ["192.168.205.10:2379"]
+address = ["192.168.1.151:2377","192.168.1.151:2378","192.168.1.151:2379"]
 key_prefix = "/"
 desc = "本机环境"
 roles = ["admin","dev"]
